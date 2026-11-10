@@ -28,8 +28,8 @@ class SignUpView(FormView):
         login(self.request, user, backend="accounts.backends.UsernameOrEmailBackend")
         messages.success(
             self.request,
-            "Welcome aboard! An admin will approve your account and set your hourly "
-            "rate, then you can start logging interviews.",
+            "Welcome aboard! An admin will approve your account and set your role and "
+            "rate, then you can start logging your work.",
         )
         return redirect("tracker:home")
 

@@ -51,7 +51,7 @@
   <section class="card">
     <header class="card-head">
       <div><h2>Team earnings</h2><p class="card-sub">Per pay week, last 8 weeks</p></div>
-      <a class="more" href="{% url 'tracker:manage_interviews' %}">Interviews {% icon "arrow-right" 16 %}</a>
+      <a class="more" href="{% url 'tracker:manage_interviews' %}">Work log {% icon "arrow-right" 16 %}</a>
     </header>
     {% if chart %}
       {% include "includes/chart.html" with chart_title="Team earnings per pay week, last 8 weeks" %}

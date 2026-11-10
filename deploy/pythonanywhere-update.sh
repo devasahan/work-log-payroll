@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Update the PythonAnywhere site to the latest code on GitHub. In a Bash console:
 #
-#   bash ~/interview_time_logger/deploy/pythonanywhere-update.sh
+#   bash ~/work-log-payroll/deploy/pythonanywhere-update.sh
 #
 # Your data and settings (.env) are kept.
 set -euo pipefail

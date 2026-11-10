@@ -1,4 +1,4 @@
-"""Admin pages: overview, team and rates, all interviews, payroll and interview types."""
+"""Admin pages: overview, team and rates, the work log, payroll and interview types."""
 
 from decimal import Decimal, InvalidOperation
 from functools import wraps
@@ -450,7 +450,7 @@ def payout_undo(request, pk):
         messages.success(
             request,
             f"Undid the {money(payout.amount)} payment to {payout.user.display_name}. "
-            "Those interviews are unpaid again.",
+            "That work is unpaid again.",
         )
         return redirect(back)
     return render(
@@ -460,7 +460,7 @@ def payout_undo(request, pk):
             "nav": "payroll",
             "title": "Undo this payment?",
             "message": (
-                "The payment record is deleted and its interviews go back to “to be paid”. "
+                "The payment record is deleted and its work goes back to “to be paid”. "
                 "Use this when a payment was recorded by mistake."
             ),
             "details": [

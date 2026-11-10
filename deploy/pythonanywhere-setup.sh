@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # First-time setup on a free PythonAnywhere account. In a PythonAnywhere Bash console:
 #
-#   git clone https://github.com/devasahan/interview_time_logger.git
-#   cd interview_time_logger
+#   git clone https://github.com/devasahan/work-log-payroll.git
+#   cd work-log-payroll
 #   bash deploy/pythonanywhere-setup.sh
 #
 # It installs the app, writes the settings file (.env), creates the database and your
