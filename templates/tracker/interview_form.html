@@ -6,7 +6,7 @@
   <div>
     <nav class="crumbs" aria-label="Breadcrumb"><a href="{{ cancel_url }}">{% icon "arrow-left" 14 %} Back</a></nav>
     <h1>{{ heading }}</h1>
-    <p class="page-sub">{% if interview and interview.user_id != user.pk %}Logged by {{ interview.user.display_name }}.{% elif kind == "work" %}Log the time you worked. Your pay is worked out from the hours.{% else %}Add the details right after the call. Your pay is worked out from the time.{% endif %}</p>
+    <p class="page-sub">{% if interview and interview.user_id != user.pk %}For {{ interview.user.display_name }}.{% elif for_member %}Log an interview for one of your interviewers. Their pay is worked out from the time and their hourly rate.{% elif kind == "work" %}Log the time you worked. Your pay is worked out from the hours.{% else %}Add the details right after the call. Your pay is worked out from the time.{% endif %}</p>
   </div>
 </div>
 {% endblock %}
@@ -14,6 +14,12 @@
 <div class="form-layout">
   <form method="post" class="card" id="interview-form" data-log-form="time">
     {% csrf_token %}
+    {% if for_member %}
+      <div class="form-section">
+        <div class="form-section-title"><h2>Who</h2><p>The interviewer who did the interview. They see it on their page, with its pay.</p></div>
+        {% include "includes/field.html" with field=form.member %}
+      </div>
+    {% endif %}
     <div class="form-section">
       {% include "includes/form_errors.html" %}
       <div class="form-section-title"><h2>When</h2><p>{% if kind == "work" %}The date and the time you started and stopped.{% else %}The date and the time the call started and ended.{% endif %} Ran past midnight? Just enter the end time; it counts as the next day.</p></div>

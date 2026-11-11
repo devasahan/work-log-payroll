@@ -22,6 +22,9 @@
   </div>
   <div class="page-actions">
     <a class="btn" href="{% url 'tracker:manage_interviews' %}?user={{ member.pk }}">{% icon "calendar-days" %} Weekly &amp; monthly history</a>
+    {% if member.status == "active" and member.work_kind == "interview" %}
+      <a class="btn btn-primary" href="{% url 'tracker:manage_interview_create' %}?user={{ member.pk }}">{% icon "plus" %} Log interview</a>
+    {% endif %}
   </div>
 </div>
 
@@ -30,7 +33,7 @@
     <span class="alert-icon">{% icon "user-plus" 20 %}</span>
     <div class="alert-body">
       <p class="alert-title">{{ member.display_name }} signed up and is waiting for approval.</p>
-      <p>Choose their role and rate below to approve them. They can start logging work right away.</p>
+      <p>Choose their role and rate below to approve them. Developers and virtual assistants then log their own work; you log interviewers' interviews.</p>
     </div>
   </div>
 {% endif %}

@@ -5,14 +5,15 @@ Work logging and weekly payroll for the AsahanTechPartners team. Interviewers, d
 **Members can:**
 - Sign up, then wait for the admin to approve them and set their role and rate.
 - Log their work. What they log depends on their role:
-  - **Interviewers** log each interview: date, start and end time, who the interview was with, the role, and the interview type (HR, Technical, Culture Call, …).
   - **Developers** log their working hours: date, start and end time, the project and the task.
   - **Virtual assistants** log how many bids they sent each day.
+  - **Interviewers** don't log anything themselves: the admin logs each of their interviews, and they see them with their pay.
 - See everything on one page, worded for their role: this week's and this month's totals (hours, or bids for virtual assistants), an earnings chart, their work by week or by month, what's still to be paid, and every payment they've received.
 
 **The admin can:**
 - Approve new sign-ups in one step on the **Team** page by choosing their role (Interviewer, Developer or Virtual assistant) and entering their rate (per hour, or per bid for a virtual assistant), and change either later. Only the admin can do this.
-- See everyone's work by week or month on the **Work log** page, filtered by member.
+- Log interviews for interviewers with **Log interview** (on the Overview, the Work log and each interviewer's page): the interviewer, date, start and end time, who the interview was with, the role, and the interview type (HR, Technical, Culture Call, …). The pay is shown as you type, at that interviewer's rate.
+- See everyone's work by week or month on the **Work log** page, filtered by member. The admin can also correct or delete any unpaid entry.
 - Change any entry's pay status between **To be paid** and **Paid** right in the lists (Overview, Work log, each pay week). Members see the new status, with the date it was paid.
 - Or run weekly payroll: review a week, pay a member (or everyone) in one go, and record it with an optional note such as a transfer reference. A payment recorded by mistake can be undone.
 - Manage the list of interview types.
@@ -45,7 +46,7 @@ Open http://127.0.0.1:8000 and log in with the admin account.
 
 1. Open a private browser window, go to http://127.0.0.1:8000/accounts/signup/ and create a member account. It says "waiting for approval".
 2. In your admin window go to **Team**, pick a role and type a rate next to the new member (per hour, or per bid for a virtual assistant), then click **Approve**.
-3. As the member, click **+ Log interview** (developers see **Log work**, virtual assistants **Log bids**) and add a few entries. They show up on the member's home page, where **Week** and **Month** switch the list.
+3. As a developer, click **+ Log work** (virtual assistants: **Log bids**) and add a few entries. For an interviewer, the admin clicks **Log interview** on the **Work log** instead. The entries show up on the member's home page, where **Week** and **Month** switch the list.
 4. As the admin, change an entry's status to **Paid** in **Work log** (or open **Payroll**, pick the week, click **Pay …** and **Mark as paid** to pay a whole week).
 5. As the member, the home page now shows the payment under **Payment history**, and those entries show as **Paid**.
 

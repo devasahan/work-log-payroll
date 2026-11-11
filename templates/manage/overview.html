@@ -8,6 +8,7 @@
     <p class="page-sub">{{ today|date:"l, F j, Y" }} · Pay week {{ week.label }}</p>
   </div>
   <div class="page-actions">
+    <a class="btn" href="{% url 'tracker:manage_interview_create' %}">{% icon "plus" %} Log interview</a>
     <a class="btn" href="{% url 'tracker:manage_payroll_week' week.start %}">{% icon "calendar-clock" %} This week's payroll</a>
     <a class="btn btn-primary" href="{% url 'tracker:manage_payroll' %}">{% icon "wallet" %} Payroll</a>
   </div>

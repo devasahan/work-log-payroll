@@ -61,7 +61,7 @@
   </td>
   {% if show_actions %}
     <td class="actions">
-      {% if not interview.is_paid %}
+      {% if not interview.is_paid and user.is_staff or not interview.is_paid and not interview.is_interview %}
         <a class="btn btn-ghost btn-sm btn-icon" href="{% if interview.is_bid_log %}{% url 'tracker:bid_edit' interview.pk %}{% else %}{% url 'tracker:interview_edit' interview.pk %}{% endif %}?next={{ request.get_full_path|urlencode }}{% if return_fragment %}{{ return_fragment|urlencode }}{% endif %}" title="Edit" aria-label="Edit the {{ interview.description }} on {{ interview.date|date:'M j' }}">{% icon "pencil" 16 %}<span class="stacked-only">Edit</span></a>
       {% endif %}
     </td>
