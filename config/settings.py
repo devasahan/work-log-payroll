@@ -1,5 +1,5 @@
 """
-Django settings for the AsahanTechPartners work and payment tracker.
+Django settings for Work Log & Payroll, the AsahanTechPartners team app.
 
 Every deployment-specific value is read from environment variables. For local
 development, copy ``.env.example`` to ``.env`` and adjust it.
@@ -149,7 +149,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # App settings
 # Shown in the header, page titles and sign-in pages.
 BRAND_NAME = "AsahanTechPartners"
-BRAND_TAGLINE = "Work & payments"
+BRAND_TAGLINE = "Work Log & Payroll"
 CURRENCY_SYMBOL = os.environ.get("CURRENCY_SYMBOL", "$")
 
 # First day of the pay week: 0 = Monday ... 6 = Sunday. Pick it before the

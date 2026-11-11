@@ -1,8 +1,9 @@
-"""Admin pages: overview, team and rates, all interviews, payroll and interview types."""
+"""Admin pages: overview, team and rates, the work log (and logging interviews), payroll and interview types."""
 
 from decimal import Decimal, InvalidOperation
 from functools import wraps
 from operator import attrgetter
+from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.contrib.auth import get_user_model
@@ -17,9 +18,18 @@ from django.views.decorators.http import require_POST
 
 from accounts.models import TeamRole
 
-from .forms import ApproveForm, ApproveWithRateForm, InterviewTypeForm, PayoutForm, RateForm, RoleForm
+from .forms import (
+    AdminInterviewForm,
+    ApproveForm,
+    ApproveWithRateForm,
+    InterviewTypeForm,
+    PayoutForm,
+    RateForm,
+    RoleForm,
+    interviewers,
+)
 from .models import HourlyRate, Interview, InterviewType, Payout
-from .periods import Period, format_range
+from .periods import Period, format_range, parse_date
 from .services import (
     CHANGED_SINCE_REVIEW,
     ZERO,
@@ -39,7 +49,7 @@ from .services import (
     undo_payout,
     weekly_chart,
 )
-from .templatetags.tracker_tags import money, work
+from .templatetags.tracker_tags import duration, money, work
 from .views import period_context, safe_next
 
 User = get_user_model()
@@ -157,8 +167,11 @@ def _save_rate(request, member, rate, effective_from, team_role=""):
         member.team_role = team_role
         member.save(update_fields=["is_approved", "team_role"])
         details = ", ".join(filter(None, [member.get_team_role_display(), f"{money(rate)}/{member.rate_unit}"]))
-        what = {"bids": "bids", "work": "work"}.get(member.work_kind, "interviews")
-        messages.success(request, f"{member.display_name} is approved ({details}) and can start logging {what}.")
+        if member.work_kind == "interview":
+            follow_up = "Log their interviews with Log interview on the Work log."
+        else:
+            follow_up = f"They can start logging {'bids' if member.logs_bids else 'work'}."
+        messages.success(request, f"{member.display_name} is approved ({details}). {follow_up}")
     else:
         messages.success(
             request, f"{member.display_name}'s rate is {money(rate)}/{member.rate_unit} from {_long_date(effective_from)}."
@@ -318,6 +331,68 @@ def interviews(request):
     )
 
 
+def _work_log_url(member_id=None, day=None):
+    query = urlencode({key: value for key, value in (("user", member_id), ("date", day and day.isoformat())) if value})
+    return f"{reverse('tracker:manage_interviews')}{'?' + query if query else ''}"
+
+
+@staff_required
+def interview_log(request):
+    """Log an interview for an interviewer. Interviewers don't log their own."""
+    back = safe_next(request, "")
+    members = list(interviewers())
+    if request.method == "POST":
+        form = AdminInterviewForm(request.POST)
+        if form.is_valid():
+            entry = form.save()
+            messages.success(
+                request,
+                f"Logged {duration(entry.duration_minutes)} for {entry.user.display_name} with {entry.interview_with}.",
+            )
+            if "add_another" in request.POST:
+                query = {"user": entry.user_id, "date": entry.date.isoformat(), **({"next": back} if back else {})}
+                return redirect(f"{reverse('tracker:manage_interview_create')}?{urlencode(query)}")
+            return redirect(_work_log_url(entry.user_id, entry.date))
+    else:
+        today = timezone.localdate()
+        member_id = _int_or_none(request.GET.get("user"))
+        day = parse_date(request.GET.get("date"))
+        form = AdminInterviewForm(
+            initial={
+                "member": member_id if any(member.pk == member_id for member in members) else None,
+                # Interviews can't be in the future, so a link from next week's log starts at today.
+                "date": day if day and day <= today else today,
+            }
+        )
+
+    rate_book = RateBook([member.pk for member in members])
+    chosen = _int_or_none(form["member"].value())
+    rates = {member.pk: [] for member in members}
+    for item in HourlyRate.objects.filter(user__in=members).order_by("effective_from"):
+        rates[item.user_id].append([item.effective_from.isoformat(), str(item.rate)])
+    return render(
+        request,
+        "tracker/interview_form.html",
+        {
+            "nav": "interviews",
+            "form": form,
+            "kind": "interview",
+            "for_member": True,
+            "heading": "Log an interview",
+            "next": back,
+            "cancel_url": back or _work_log_url(chosen),
+            "pay": {
+                "unit": "h",
+                "unit_word": "hour",
+                "rate": rate_book.current_rate(chosen) if chosen else None,
+                "today": timezone.localdate(),
+                # Every interviewer's rate changes, so the preview follows the member and date picked.
+                "rates_by_member": rates,
+            },
+        },
+    )
+
+
 @staff_required
 def payroll(request):
     today = timezone.localdate()
@@ -450,7 +525,7 @@ def payout_undo(request, pk):
         messages.success(
             request,
             f"Undid the {money(payout.amount)} payment to {payout.user.display_name}. "
-            "Those interviews are unpaid again.",
+            "That work is unpaid again.",
         )
         return redirect(back)
     return render(
@@ -460,7 +535,7 @@ def payout_undo(request, pk):
             "nav": "payroll",
             "title": "Undo this payment?",
             "message": (
-                "The payment record is deleted and its interviews go back to “to be paid”. "
+                "The payment record is deleted and its work goes back to “to be paid”. "
                 "Use this when a payment was recorded by mistake."
             ),
             "details": [

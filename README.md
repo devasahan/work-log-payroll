@@ -1,18 +1,19 @@
-# AsahanTechPartners — work & payment tracker
+# Work Log & Payroll
 
-A web app where AsahanTechPartners team members (interviewers, developers and virtual assistants) log their work, and the admin pays them weekly at each member's own rate: per hour for interviewers and developers, per bid for virtual assistants.
+Work logging and weekly payroll for the AsahanTechPartners team. Developers and virtual assistants log their own work, the admin logs interviewers' interviews, and the admin pays each member weekly at their own rate: per hour for interviewers and developers, per bid for virtual assistants.
 
 **Members can:**
 - Sign up, then wait for the admin to approve them and set their role and rate.
-- Log their work. What they log depends on their role:
-  - **Interviewers** log each interview: date, start and end time, who the interview was with, the role, and the interview type (HR, Technical, Culture Call, …).
+- Track their work, depending on their role:
   - **Developers** log their working hours: date, start and end time, the project and the task.
   - **Virtual assistants** log how many bids they sent each day.
+  - **Interviewers** don't log anything themselves: the admin logs each of their interviews, and they see them with their pay.
 - See everything on one page, worded for their role: this week's and this month's totals (hours, or bids for virtual assistants), an earnings chart, their work by week or by month, what's still to be paid, and every payment they've received.
 
 **The admin can:**
 - Approve new sign-ups in one step on the **Team** page by choosing their role (Interviewer, Developer or Virtual assistant) and entering their rate (per hour, or per bid for a virtual assistant), and change either later. Only the admin can do this.
-- See everyone's work by week or month on the **Work log** page, filtered by member.
+- Log interviews for interviewers with **Log interview** (on the Overview, the Work log and each interviewer's page): the interviewer, date, start and end time, who the interview was with, the role, and the interview type (HR, Technical, Culture Call, …). The pay is shown as you type, at that interviewer's rate.
+- See everyone's work by week or month on the **Work log** page, filtered by member. The admin can also correct or delete any unpaid entry.
 - Change any entry's pay status between **To be paid** and **Paid** right in the lists (Overview, Work log, each pay week). Members see the new status, with the date it was paid.
 - Or run weekly payroll: review a week, pay a member (or everyone) in one go, and record it with an optional note such as a transfer reference. A payment recorded by mistake can be undone.
 - Manage the list of interview types.
@@ -27,7 +28,7 @@ Built with Django 5.2 (LTS). It uses SQLite locally and Postgres in production.
 You need **Python 3.10 or newer**.
 
 ```bash
-git clone <this repo> && cd interview_time_logger
+git clone https://github.com/devasahan/work-log-payroll.git && cd work-log-payroll
 
 python3 -m venv .venv
 source .venv/bin/activate            # Windows: .venv\Scripts\activate
@@ -45,7 +46,7 @@ Open http://127.0.0.1:8000 and log in with the admin account.
 
 1. Open a private browser window, go to http://127.0.0.1:8000/accounts/signup/ and create a member account. It says "waiting for approval".
 2. In your admin window go to **Team**, pick a role and type a rate next to the new member (per hour, or per bid for a virtual assistant), then click **Approve**.
-3. As the member, click **+ Log interview** (developers see **Log work**, virtual assistants **Log bids**) and add a few entries. They show up on the member's home page, where **Week** and **Month** switch the list.
+3. As a developer, click **+ Log work** (virtual assistants: **Log bids**) and add a few entries. For an interviewer, the admin clicks **Log interview** on the **Work log** instead. The entries show up on the member's home page, where **Week** and **Month** switch the list.
 4. As the admin, change an entry's status to **Paid** in **Work log** (or open **Payroll**, pick the week, click **Pay …** and **Mark as paid** to pay a whole week).
 5. As the member, the home page now shows the payment under **Payment history**, and those entries show as **Paid**.
 
@@ -74,13 +75,13 @@ All settings are environment variables. For local use, put them in `.env` (see `
 | --- | --- | --- |
 | `DJANGO_DEBUG` | `False` | `True` only on your own computer. |
 | `DJANGO_SECRET_KEY` | none | **Required in production.** Generate one with `python -c "import secrets; print(secrets.token_urlsafe(50))"`. |
-| `DJANGO_ALLOWED_HOSTS` | none | **Required in production.** Your domain(s), comma-separated, e.g. `timelog.example.com`. |
+| `DJANGO_ALLOWED_HOSTS` | none | **Required in production.** Your domain(s), comma-separated, e.g. `payroll.example.com`. |
 | `DATABASE_URL` | SQLite file | e.g. `postgres://user:pass@host:5432/dbname` |
 | `TIME_ZONE` | `UTC` | Decides what "today" and "this week" mean, e.g. `America/New_York`, `Asia/Colombo`. |
 | `CURRENCY_SYMBOL` | `$` | Shown in front of amounts, e.g. `€`, `£`, `Rs.` |
 | `WEEK_START_DAY` | `0` | First day of the pay week: `0` = Monday … `6` = Sunday. Set it before your first payment. |
 | `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `ADMIN_EMAIL` | none | If set, the admin account is created at startup (the Docker image does this). Useful on hosts without a shell. An existing account is never changed. |
-| `DJANGO_CSRF_TRUSTED_ORIGINS` | none | Only if forms fail with "CSRF verification failed", e.g. `https://timelog.example.com`. |
+| `DJANGO_CSRF_TRUSTED_ORIGINS` | none | Only if forms fail with "CSRF verification failed", e.g. `https://payroll.example.com`. |
 | `DJANGO_USE_HTTPS` | on when not debugging | Secure cookies and redirect to HTTPS. Set `False` only to try a production build over plain http on your own machine. |
 | `DJANGO_HSTS_SECONDS` | `0` | Optional HSTS once HTTPS works, e.g. `31536000`. |
 
@@ -95,8 +96,8 @@ A free PythonAnywhere account runs the app at `https://<your-username>.pythonany
 1. Sign up for a free **Beginner** account at [pythonanywhere.com](https://www.pythonanywhere.com/). Your username becomes the site's address.
 2. Open **Consoles → Bash** and run:
    ```bash
-   git clone https://github.com/devasahan/interview_time_logger.git
-   cd interview_time_logger
+   git clone https://github.com/devasahan/work-log-payroll.git
+   cd work-log-payroll
    bash deploy/pythonanywhere-setup.sh
    ```
    It asks for your time zone and currency, installs the app, creates the database and your admin account, and then prints exactly what to enter on the **Web** tab.
@@ -105,10 +106,10 @@ A free PythonAnywhere account runs the app at `https://<your-username>.pythonany
 To update the site after new changes are merged on GitHub, run this in a Bash console:
 
 ```bash
-bash ~/interview_time_logger/deploy/pythonanywhere-update.sh
+bash ~/work-log-payroll/deploy/pythonanywhere-update.sh
 ```
 
-**Back up your data:** now and then, download `interview_time_logger/db.sqlite3` from the **Files** tab.
+**Back up your data:** now and then, download `work-log-payroll/db.sqlite3` from the **Files** tab.
 
 ### Other hosts
 
@@ -124,8 +125,8 @@ Checklist for any other host:
 The included `Dockerfile` builds the app, collects static files, and on start runs migrations, creates the admin account if asked, and starts gunicorn on `$PORT` (default 8000).
 
 ```bash
-docker build -t interview-time-logger .
-docker run -p 8000:8000 --env-file production.env interview-time-logger
+docker build -t work-log-payroll .
+docker run -p 8000:8000 --env-file production.env work-log-payroll
 ```
 
 - **Render:** create a PostgreSQL database and a Web Service from this repo (it detects the Dockerfile). Set the environment variables, with `DATABASE_URL` from the database's internal URL. Your `*.onrender.com` hostname is allowed automatically. Health check path: `/healthz/`.

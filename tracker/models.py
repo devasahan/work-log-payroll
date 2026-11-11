@@ -232,6 +232,8 @@ def validate_time_slot(*, user_id, day, start, end, exclude_pk=None, kind="inter
         what = "An interview" if kind == "interview" else "One entry"
         raise ValidationError({"end_time": f"{what} can't be longer than 12 hours. Check the start and end times."})
 
+    if user_id is None:
+        return  # the admin hasn't picked whose interview it is yet; nothing to overlap with
     nearby = Interview.objects.filter(
         user_id=user_id, date__range=(day - timedelta(days=1), day + timedelta(days=1)), bids__isnull=True
     )

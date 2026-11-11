@@ -7,7 +7,7 @@
 <div class="hero" id="overview">
   <div class="hero-main">
     <p class="hero-date">{{ today|date:"l, F j, Y" }}</p>
-    {% if user.can_log_interviews %}
+    {% if user.has_access %}
       <h1>Welcome back, {{ user.first_name|default:user.username }}</h1>
       <ul class="hero-meta" aria-label="Your account">
         {% if user.team_role %}<li>{% icon "briefcase-business" 15 %}{{ user.get_team_role_display }}</li>{% endif %}
@@ -20,7 +20,7 @@
     {% endif %}
   </div>
 
-  {% if user.can_log_interviews %}
+  {% if user.has_access %}
     <section class="today{% if today_totals.count %} is-done{% endif %}" aria-labelledby="today-title">
       <h2 class="today-label" id="today-title">Today</h2>
       {% if kind == "bids" %}
@@ -35,10 +35,13 @@
       {% elif today_totals.count %}
         <p class="today-value">{{ today_totals.minutes|duration }}<span class="amount">{{ today_totals.earned|money }}</span></p>
         <p class="today-sub">{% if kind == "work" %}{{ today_totals.count }} entr{{ today_totals.count|pluralize:"y,ies" }} logged{% else %}{{ today_totals.interview_count }} interview{{ today_totals.interview_count|pluralize }}{% endif %}</p>
-        <a class="btn btn-glass btn-sm" href="{% url 'tracker:interview_create' %}">{% icon "plus" 16 %} {% if kind == "work" %}Log more work{% else %}Log another interview{% endif %}</a>
-      {% else %}
+        {% if user.logs_own_work %}<a class="btn btn-glass btn-sm" href="{% url 'tracker:interview_create' %}">{% icon "plus" 16 %} Log more work</a>{% endif %}
+      {% elif user.logs_own_work %}
         <p class="today-value quiet">Nothing logged yet</p>
-        <a class="btn btn-light btn-sm" href="{% url 'tracker:interview_create' %}">{% icon "plus" 16 %} {% if kind == "work" %}Log work{% else %}Log an interview{% endif %}</a>
+        <a class="btn btn-light btn-sm" href="{% url 'tracker:interview_create' %}">{% icon "plus" 16 %} Log work</a>
+      {% else %}
+        <p class="today-value quiet">No interviews yet</p>
+        <p class="today-sub">Your admin logs your interviews.</p>
       {% endif %}
     </section>
   {% endif %}
@@ -47,17 +50,17 @@
 {% endblock %}
 
 {% block content %}
-{% if not user.can_log_interviews %}
+{% if not user.has_access %}
   <section class="card approval-card">
     <div class="approval-card-body">
       <span class="approval-icon">{% icon "hourglass" 24 %}</span>
       <h2>Your account is waiting for approval</h2>
-      <p>An admin checks every new account and sets your role and your rate. Right after that, this page becomes your dashboard: you log your work here and see every payment.</p>
+      <p>An admin checks every new account and sets your role and your rate. Right after that, this page becomes your dashboard for your work and every payment.</p>
     </div>
     <ol class="steps">
       <li class="done"><span class="step-dot">{% icon "check" 14 %}</span><div><strong>Account created</strong><span>{{ user.date_joined|date:"M j, Y" }}</span></div></li>
       <li class="current"><span class="step-dot"></span><div><strong>Admin approval</strong><span>Your admin chooses your role and your rate</span></div></li>
-      <li><span class="step-dot"></span><div><strong>Start logging your work</strong><span>Interviews, working hours or daily bids, depending on your role</span></div></li>
+      <li><span class="step-dot"></span><div><strong>Start tracking your work</strong><span>Log your working hours or daily bids. Interviewers: your admin logs your interviews.</span></div></li>
     </ol>
   </section>
 {% else %}
@@ -88,10 +91,11 @@
 <div class="grid-split">
   <section class="card fill">
     <header class="card-head"><div><h2>Your earnings</h2><p class="card-sub">Per pay week, last 8 weeks</p></div></header>
+    {% if kind == "interview" %}{% firstof "Your weekly earnings appear here once your admin logs your interviews." as earnings_hint %}{% else %}{% firstof "Your weekly earnings appear here once you log your work." as earnings_hint %}{% endif %}
     {% if chart %}
       {% include "includes/chart.html" with chart_title="Your earnings per pay week, last 8 weeks" %}
     {% else %}
-      {% include "includes/empty.html" with empty_icon="trending-up" empty_title="No earnings yet" empty_text="Your weekly earnings appear here once you log your work." %}
+      {% include "includes/empty.html" with empty_icon="trending-up" empty_title="No earnings yet" empty_text=earnings_hint %}
     {% endif %}
   </section>
 
@@ -115,7 +119,7 @@
       </ul>
       <div class="card-foot total-foot"><span>Total to be paid</span><strong>{{ unpaid_totals.unpaid|money }}</strong></div>
     {% else %}
-      {% include "includes/empty.html" with empty_icon="circle-check" empty_title="You're all paid up" empty_text="Everything you've logged has been paid." %}
+      {% include "includes/empty.html" with empty_icon="circle-check" empty_title="You're all paid up" empty_text="All your work has been paid." %}
     {% endif %}
   </section>
 </div>
@@ -137,8 +141,7 @@
     {% url 'tracker:interview_create' as create_url %}
     {% include "includes/empty.html" with empty_icon="calendar-days" empty_title="No work logged in "|add:period.label empty_text="Log your hours with the button at the top, or use the arrows to look at other dates." empty_url=create_url empty_action="Log work" %}
   {% else %}
-    {% url 'tracker:interview_create' as create_url %}
-    {% include "includes/empty.html" with empty_icon="calendar-days" empty_title="No interviews in "|add:period.label empty_text="Log one with the button at the top, or use the arrows to look at other dates." empty_url=create_url empty_action="Log interview" %}
+    {% include "includes/empty.html" with empty_icon="calendar-days" empty_title="No interviews in "|add:period.label empty_text="Your admin logs your interviews. Use the arrows to look at other dates." %}
   {% endif %}
 </section>
 

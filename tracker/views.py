@@ -101,7 +101,7 @@ def home(request):
             "chart": weekly_chart(in_range, weeks),
             "totals": Totals.of(shown),
             "groups": group_for_display(period, shown),
-            "show_actions": True,
+            "show_actions": user.logs_own_work,
             "payouts": Paginator(user.payouts.all(), 10).get_page(request.GET.get("page")),
             **period_context(period),
         },
@@ -170,21 +170,33 @@ def _log_form_page(request, form, kind, entry=None, **extra):
     )
 
 
+ADMIN_LOGS_INTERVIEWS = "Your admin logs your interviews. Ask them if something needs changing."
+
+
 def _can_log(request):
-    if request.user.can_log_interviews:
+    if request.user.logs_own_work:
         return True
-    messages.error(request, "Your account needs admin approval before you can log work.")
+    if request.user.has_access:
+        messages.info(request, ADMIN_LOGS_INTERVIEWS)
+    else:
+        messages.error(request, "Your account needs admin approval before you can log work.")
     return False
+
+
+def _with_query(url, request):
+    return f"{url}?{request.GET.urlencode()}".rstrip("?")
 
 
 @login_required
 def interview_create(request):
-    """Log an interview, or developer work, depending on the member's role."""
+    """Developers log their work here. Interviews are logged by the admin, on their own form."""
+    if request.user.is_staff:
+        return redirect(_with_query(reverse("tracker:manage_interview_create"), request))
     if not _can_log(request):
         return redirect("tracker:home")
     kind = request.user.work_kind
     if kind == "bids":
-        return redirect(f"{reverse('tracker:bid_create')}?{request.GET.urlencode()}".rstrip("?"))
+        return redirect(_with_query(reverse("tracker:bid_create"), request))
 
     form_class = TIME_FORMS[kind]
     if request.method == "POST":
@@ -206,10 +218,10 @@ def interview_create(request):
 @login_required
 def bid_create(request):
     """Virtual assistants log how many bids they sent on a day."""
+    if request.user.is_staff or not request.user.logs_bids:
+        return redirect("tracker:interview_create")
     if not _can_log(request):
         return redirect("tracker:home")
-    if not request.user.logs_bids:
-        return redirect("tracker:interview_create")
 
     if request.method == "POST":
         form = BidForm(request.POST, owner=request.user)
@@ -245,8 +257,18 @@ def _back_url(request, interview):
 PAID_LOCKED = "This work is already paid, so it can't be changed."
 
 
+def _may_change(request, entry):
+    """Admins change any entry; members only their own work and bids, never interviews."""
+    if request.user.is_staff or (request.user.logs_own_work and not entry.is_interview):
+        return True
+    messages.error(request, ADMIN_LOGS_INTERVIEWS if entry.is_interview else "Only your admin can change this entry.")
+    return False
+
+
 def _edit_entry(request, entry, form_class, kind):
     back = _back_url(request, entry)
+    if not _may_change(request, entry):
+        return redirect(back)
     if entry.is_paid:
         messages.error(request, PAID_LOCKED)
         return redirect(back)
@@ -305,6 +327,8 @@ def _entry_details(entry):
 def interview_delete(request, pk):
     interview = _editable_interview(request, pk)
     back = _back_url(request, interview)
+    if not _may_change(request, interview):
+        return redirect(back)
     if interview.is_paid:
         messages.error(request, PAID_LOCKED)
         return redirect(back)

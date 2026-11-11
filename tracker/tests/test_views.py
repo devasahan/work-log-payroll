@@ -8,7 +8,16 @@ from django.utils import timezone
 from tracker.models import HourlyRate, Interview, InterviewType, Payout
 from tracker.periods import Period
 
-from .factories import PASSWORD, interview_type, make_admin, make_bids, make_interview, make_user, set_rate
+from .factories import (
+    PASSWORD,
+    interview_type,
+    make_admin,
+    make_bids,
+    make_interview,
+    make_user,
+    make_work,
+    set_rate,
+)
 
 
 def last_week():
@@ -27,6 +36,7 @@ class AccessTests(TestCase):
         reverse("tracker:manage_payroll"),
         reverse("tracker:manage_types"),
         reverse("tracker:manage_payroll_week", args=[last_week().start]),
+        reverse("tracker:manage_interview_create"),
     ]
 
     def test_anonymous_visitors_are_sent_to_login(self):
@@ -86,25 +96,28 @@ class AccessTests(TestCase):
         self.assertEqual(self.client.get("/healthz/").content, b"ok")
 
 
-class MemberFlowTests(TestCase):
+def interview_data(**overrides):
+    data = {
+        "date": timezone.localdate().isoformat(),
+        "start_time": "09:00",
+        "end_time": "10:30",
+        "interview_with": "Globex",
+        "role": "Data Engineer",
+        "interview_type": interview_type("HR").pk,
+        "notes": "",
+    }
+    data.update(overrides)
+    return data
+
+
+class InterviewerFlowTests(TestCase):
+    """Interviewers see their interviews and pay; the admin logs the interviews."""
+
     def setUp(self):
-        self.user = make_user()
+        self.user = make_user(team_role="interviewer")
         set_rate(self.user, 20)
         self.client.force_login(self.user)
         self.today = timezone.localdate()
-
-    def form_data(self, **overrides):
-        data = {
-            "date": self.today.isoformat(),
-            "start_time": "09:00",
-            "end_time": "10:30",
-            "interview_with": "Globex",
-            "role": "Data Engineer",
-            "interview_type": interview_type("HR").pk,
-            "notes": "",
-        }
-        data.update(overrides)
-        return data
 
     def test_pending_members_cannot_log_interviews(self):
         pending = make_user("newbie", approved=False)
@@ -114,59 +127,42 @@ class MemberFlowTests(TestCase):
         self.assertContains(response, "Admin approval")
         self.assertNotContains(response, "Log interview")
         self.assertRedirects(self.client.get(reverse("tracker:interview_create")), reverse("tracker:home"))
-        self.client.post(reverse("tracker:interview_create"), self.form_data())
+        self.client.post(reverse("tracker:interview_create"), interview_data())
         self.assertFalse(Interview.objects.exists())
 
-    def test_log_an_interview(self):
-        response = self.client.post(reverse("tracker:interview_create"), self.form_data())
-        interview = Interview.objects.get()
-        self.assertEqual((interview.user, interview.duration_minutes), (self.user, 90))
+    def test_interviewers_cannot_log_interviews(self):
+        response = self.client.get(reverse("tracker:interview_create"), follow=True)
+        self.assertRedirects(response, reverse("tracker:home"))
+        self.assertContains(response, "Your admin logs your interviews")
+        self.client.post(reverse("tracker:interview_create"), interview_data())
+        self.assertFalse(Interview.objects.exists())
         self.assertRedirects(
-            response, f"{reverse('tracker:home')}?period=week&date={self.today.isoformat()}#interviews"
+            self.client.get(reverse("tracker:bid_create")), reverse("tracker:interview_create"),
+            fetch_redirect_response=False,
         )
-        home = self.client.get(response.url)
-        self.assertContains(home, "Globex")
-        self.assertContains(home, "$30.00")
-        # Editing from the list comes back to the same spot on the page.
-        self.assertContains(home, "%23interviews")
 
-    def test_save_and_log_another_keeps_the_date(self):
-        response = self.client.post(reverse("tracker:interview_create"), {**self.form_data(), "add_another": "1"})
-        self.assertRedirects(response, f"{reverse('tracker:interview_create')}?date={self.today.isoformat()}")
-
-    def test_invalid_times_show_an_error(self):
-        response = self.client.post(reverse("tracker:interview_create"), self.form_data(end_time="09:00"))
-        self.assertContains(response, "must be different from the start time")
+    def test_members_without_a_role_are_treated_as_interviewers(self):
+        self.client.force_login(make_user("old-timer"))
+        self.client.post(reverse("tracker:interview_create"), interview_data())
         self.assertFalse(Interview.objects.exists())
 
-    def test_double_submit_is_rejected_as_overlap(self):
-        self.client.post(reverse("tracker:interview_create"), self.form_data())
-        response = self.client.post(reverse("tracker:interview_create"), self.form_data())
-        self.assertContains(response, "overlaps another logged interview")
-        self.assertEqual(Interview.objects.count(), 1)
-
-    def test_edit_and_delete_own_unpaid_interview(self):
+    def test_interviewers_cannot_change_their_interviews(self):
         interview = make_interview(self.user, day=self.today)
-        self.client.post(
-            reverse("tracker:interview_edit", args=[interview.pk]),
-            self.form_data(start_time="09:00", end_time="09:45"),
-        )
-        interview.refresh_from_db()
-        self.assertEqual(interview.duration_minutes, 45)
-        self.client.post(reverse("tracker:interview_delete", args=[interview.pk]))
-        self.assertFalse(Interview.objects.exists())
-
-    def test_paid_interviews_are_locked(self):
-        interview = make_interview(self.user, day=self.today)
-        payout = Payout.objects.create(
-            user=self.user, period_start=self.today, period_end=self.today,
-            interview_count=1, total_minutes=60, amount=Decimal("20"),
-        )
-        Interview.objects.filter(pk=interview.pk).update(payout=payout, paid_rate=20, paid_amount=20)
-        self.client.post(reverse("tracker:interview_edit", args=[interview.pk]), self.form_data(end_time="12:00"))
+        response = self.client.get(reverse("tracker:interview_edit", args=[interview.pk]), follow=True)
+        self.assertContains(response, "Your admin logs your interviews")
+        self.client.post(reverse("tracker:interview_edit", args=[interview.pk]), interview_data(end_time="12:00"))
         self.client.post(reverse("tracker:interview_delete", args=[interview.pk]))
         interview.refresh_from_db()
         self.assertEqual(interview.duration_minutes, 60)
+
+    def test_home_has_no_logging_buttons(self):
+        make_interview(self.user, day=self.today)
+        home = self.client.get(reverse("tracker:home"))
+        self.assertContains(home, "Acme Corp")
+        self.assertNotContains(home, reverse("tracker:interview_create"))
+        self.assertNotContains(home, reverse("tracker:interview_edit", args=[Interview.objects.get().pk]))
+        empty_week = self.client.get(reverse("tracker:home"), {"date": (self.today - timedelta(days=70)).isoformat()})
+        self.assertContains(empty_week, "Your admin logs your interviews")
 
     def test_home_shows_interviews_by_week_or_month(self):
         make_interview(self.user, day=self.today, start=time(9, 0), end=time(11, 0))
@@ -189,6 +185,137 @@ class MemberFlowTests(TestCase):
         self.assertContains(self.client.get(reverse("tracker:home")), "Virtual assistant")
 
 
+class AdminLogsInterviewsTests(TestCase):
+    def setUp(self):
+        self.admin = make_admin()
+        self.client.force_login(self.admin)
+        self.interviewer = make_user("priya", team_role="interviewer")
+        set_rate(self.interviewer, 20)
+        self.today = timezone.localdate()
+        self.url = reverse("tracker:manage_interview_create")
+
+    def data(self, **overrides):
+        return interview_data(member=self.interviewer.pk, **overrides)
+
+    def test_log_an_interview_for_an_interviewer(self):
+        response = self.client.post(self.url, self.data())
+        interview = Interview.objects.get()
+        self.assertEqual((interview.user, interview.duration_minutes, interview.kind), (self.interviewer, 90, "interview"))
+        self.assertRedirects(
+            response,
+            f"{reverse('tracker:manage_interviews')}?user={self.interviewer.pk}&date={self.today.isoformat()}",
+        )
+        self.client.force_login(self.interviewer)
+        home = self.client.get(reverse("tracker:home"))
+        self.assertContains(home, "Globex")
+        self.assertContains(home, "$30.00")
+
+    def test_save_and_log_another_keeps_the_interviewer_and_date(self):
+        response = self.client.post(self.url, {**self.data(), "add_another": "1"})
+        self.assertRedirects(response, f"{self.url}?user={self.interviewer.pk}&date={self.today.isoformat()}")
+        page = self.client.get(response.url)
+        self.assertContains(page, f'<option value="{self.interviewer.pk}" selected>')
+
+    def test_invalid_times_show_an_error(self):
+        response = self.client.post(self.url, self.data(end_time="09:00"))
+        self.assertContains(response, "must be different from the start time")
+        self.assertFalse(Interview.objects.exists())
+
+    def test_overlap_is_checked_for_that_interviewer(self):
+        self.client.post(self.url, self.data())
+        response = self.client.post(self.url, self.data())
+        self.assertContains(response, "overlaps another logged interview")
+        other = make_user("omar", team_role="interviewer")
+        self.client.post(self.url, interview_data(member=other.pk))
+        self.assertEqual(Interview.objects.count(), 2)
+
+    def test_the_interviewer_is_required(self):
+        response = self.client.post(self.url, interview_data())
+        self.assertContains(response, "Choose who did the interview.")
+        self.assertFalse(Interview.objects.exists())
+
+    def test_only_interviewers_can_be_chosen(self):
+        others = [
+            make_user("dana", team_role="developer"),
+            make_user("juan", team_role="virtual_assistant"),
+            make_user("newbie", approved=False, team_role="interviewer"),
+            make_user("gone", team_role="interviewer", is_active=False),
+        ]
+        page = self.client.get(self.url)
+        self.assertContains(page, f'<option value="{self.interviewer.pk}">Priya</option>')
+        self.assertEqual(list(page.context["form"].fields["member"].queryset), [self.interviewer])
+        response = self.client.post(self.url, interview_data(member=others[0].pk))
+        self.assertContains(response, "Choose one of your interviewers.")
+        self.assertFalse(Interview.objects.exists())
+
+    def test_the_form_shows_each_interviewers_pay(self):
+        page = self.client.get(self.url, {"user": self.interviewer.pk, "date": "2026-10-05"})
+        self.assertContains(page, f'<option value="{self.interviewer.pk}" selected>')
+        self.assertContains(page, 'value="2026-10-05"')
+        self.assertContains(page, "$20.00 per hour")
+        self.assertContains(page, 'id="pay-rates-by-member"')
+        self.assertContains(page, '"2026-01-01", "20.00"')
+
+    def test_the_members_form_sends_admins_here(self):
+        self.assertRedirects(
+            self.client.get(reverse("tracker:interview_create"), {"date": "2026-10-05"}),
+            f"{self.url}?date=2026-10-05",
+        )
+
+    def test_admin_pages_link_to_the_form(self):
+        self.assertContains(self.client.get(reverse("tracker:manage_overview")), self.url)
+        self.assertContains(self.client.get(reverse("tracker:manage_interviews")), self.url)
+        self.assertContains(
+            self.client.get(reverse("tracker:manage_member", args=[self.interviewer.pk])),
+            f"{self.url}?user={self.interviewer.pk}",
+        )
+
+    def test_paid_interviews_are_locked(self):
+        interview = make_interview(self.interviewer, day=self.today)
+        payout = Payout.objects.create(
+            user=self.interviewer, period_start=self.today, period_end=self.today,
+            interview_count=1, total_minutes=60, amount=Decimal("20"),
+        )
+        Interview.objects.filter(pk=interview.pk).update(payout=payout, paid_rate=20, paid_amount=20)
+        self.client.post(reverse("tracker:interview_edit", args=[interview.pk]), interview_data(end_time="12:00"))
+        self.client.post(reverse("tracker:interview_delete", args=[interview.pk]))
+        interview.refresh_from_db()
+        self.assertEqual(interview.duration_minutes, 60)
+
+    def test_date_and_time_checks_run_before_an_interviewer_is_picked(self):
+        response = self.client.post(self.url, interview_data(end_time="09:00"))
+        self.assertContains(response, "Choose who did the interview.")
+        self.assertContains(response, "must be different from the start time")
+
+    def test_links_only_preselect_interviewers_and_past_days(self):
+        developer = make_user("dana", team_role="developer")
+        page = self.client.get(self.url, {"user": developer.pk, "date": (self.today + timedelta(days=7)).isoformat()})
+        self.assertEqual(page.context["form"]["member"].value(), None)
+        self.assertEqual(page.context["form"]["date"].value(), self.today)
+        self.assertContains(page, "Choose the interviewer to see the pay.")
+        work_log = self.client.get(reverse("tracker:manage_interviews"), {"user": developer.pk})
+        self.assertContains(work_log, f"{self.url}?date=")
+        self.assertNotContains(work_log, f"{self.url}?user={developer.pk}")
+
+    def test_says_what_to_do_when_there_are_no_interviewers(self):
+        self.interviewer.team_role = "developer"
+        self.interviewer.save()
+        self.assertContains(self.client.get(self.url), "No interviewers yet.")
+
+    def test_back_returns_to_the_page_the_admin_came_from(self):
+        member_page = reverse("tracker:manage_member", args=[self.interviewer.pk])
+        page = self.client.get(self.url, {"user": self.interviewer.pk, "next": member_page})
+        self.assertEqual(page.context["cancel_url"], member_page)
+        response = self.client.post(self.url, {**self.data(), "add_another": "1", "next": member_page})
+        self.assertIn("next=", response.url)
+        self.assertEqual(self.client.get(response.url).context["cancel_url"], member_page)
+
+    def test_admin_can_delete_an_interview(self):
+        interview = make_interview(self.interviewer, day=self.today)
+        self.client.post(reverse("tracker:interview_delete", args=[interview.pk]))
+        self.assertFalse(Interview.objects.exists())
+
+
 class AdminFlowTests(TestCase):
     def setUp(self):
         self.admin = make_admin()
@@ -202,7 +329,7 @@ class AdminFlowTests(TestCase):
 
         response = self.client.post(approve_url, {"team_role": "interviewer", "rate": "20"}, follow=True)
         self.assertRedirects(response, reverse("tracker:manage_team"))
-        self.assertContains(response, "is approved (Interviewer, $20.00/h)")
+        self.assertContains(response, "is approved (Interviewer, $20.00/h). Log their interviews")
         newbie.refresh_from_db()
         self.assertTrue(newbie.is_approved)
         self.assertEqual(newbie.team_role, "interviewer")
@@ -574,6 +701,38 @@ class DeveloperFlowTests(TestCase):
         response = self.client.post(reverse("tracker:interview_create"), data)
         self.assertEqual(response.status_code, 200)
         self.assertFalse(Interview.objects.exists())
+
+    def test_double_submit_is_rejected_as_overlap(self):
+        data = {
+            "date": self.today.isoformat(), "start_time": "09:00", "end_time": "10:00",
+            "interview_with": "Acme website", "role": "Fix the menu", "notes": "",
+        }
+        self.client.post(reverse("tracker:interview_create"), data)
+        response = self.client.post(reverse("tracker:interview_create"), data)
+        self.assertContains(response, "overlaps time you already logged")
+        self.assertEqual(Interview.objects.count(), 1)
+
+    def test_edit_and_delete_own_unpaid_work(self):
+        entry = make_work(self.dev, day=self.today)
+        home = self.client.get(reverse("tracker:home"))
+        self.assertContains(home, reverse("tracker:interview_edit", args=[entry.pk]))
+        data = {
+            "date": self.today.isoformat(), "start_time": "09:00", "end_time": "09:45",
+            "interview_with": "Acme website", "role": "Fix the menu", "notes": "",
+        }
+        self.client.post(reverse("tracker:interview_edit", args=[entry.pk]), data)
+        entry.refresh_from_db()
+        self.assertEqual((entry.duration_minutes, entry.role), (45, "Fix the menu"))
+        self.client.post(reverse("tracker:interview_delete", args=[entry.pk]))
+        self.assertFalse(Interview.objects.exists())
+
+    def test_interviews_from_an_earlier_role_stay_with_the_admin(self):
+        interview = make_interview(self.dev, day=self.today)
+        self.assertNotContains(
+            self.client.get(reverse("tracker:home")), reverse("tracker:interview_edit", args=[interview.pk])
+        )
+        self.client.post(reverse("tracker:interview_delete", args=[interview.pk]))
+        self.assertTrue(Interview.objects.filter(pk=interview.pk).exists())
 
 
 class PayingBidsTests(TestCase):

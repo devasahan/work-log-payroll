@@ -1,4 +1,5 @@
 from django import forms
+from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db.models import Q
@@ -42,7 +43,7 @@ class TimedEntryForm(forms.ModelForm):
     def __init__(self, *args, owner, **kwargs):
         super().__init__(*args, **kwargs)
         self.owner = owner
-        if self.instance.pk is None:
+        if self.instance.pk is None and owner is not None:
             self.instance.user = owner
         # Optional in the database (bid entries leave them empty) but needed here.
         for name in self.required_fields:
@@ -54,7 +55,12 @@ class TimedEntryForm(forms.ModelForm):
         if day is not None and start is not None and end is not None:
             try:
                 validate_time_slot(
-                    user_id=self.owner.pk, day=day, start=start, end=end, exclude_pk=self.instance.pk, kind=self.kind
+                    user_id=getattr(self.owner, "pk", None),
+                    day=day,
+                    start=start,
+                    end=end,
+                    exclude_pk=self.instance.pk,
+                    kind=self.kind,
                 )
             except ValidationError as error:
                 self.add_error(None, error)
@@ -74,7 +80,7 @@ class InterviewForm(TimedEntryForm):
             "role": "Role",
         }
         help_texts = {
-            "interview_with": "The company or person you interviewed with.",
+            "interview_with": "The company or person they interviewed with.",
         }
 
     def __init__(self, *args, **kwargs):
@@ -87,6 +93,37 @@ class InterviewForm(TimedEntryForm):
         self.fields["interview_type"].empty_label = "Choose a type"
         self.fields["interview_with"].widget.attrs["placeholder"] = "e.g. Acme Corp or Jane Smith"
         self.fields["role"].widget.attrs["placeholder"] = "e.g. Senior Backend Engineer"
+
+
+def interviewers():
+    """Members whose interviews the admin logs: approved interviewers, and approved members without a role."""
+    return get_user_model().objects.filter(
+        is_active=True, is_approved=True, is_staff=False, team_role__in=[TeamRole.INTERVIEWER, ""]
+    )
+
+
+class AdminInterviewForm(InterviewForm):
+    """The admin logs an interview for an interviewer; interviewers don't log their own."""
+
+    member = forms.ModelChoiceField(
+        queryset=get_user_model().objects.none(),
+        label="Interviewer",
+        empty_label="Choose an interviewer",
+        error_messages={"required": "Choose who did the interview.", "invalid_choice": "Choose one of your interviewers."},
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, owner=None, **kwargs)
+        member = self.fields["member"]
+        member.queryset = interviewers()
+        if not member.queryset.exists():
+            member.help_text = "No interviewers yet. Approve a member as an Interviewer on the Team page first."
+
+    def clean(self):
+        member = self.cleaned_data.get("member")
+        if member is not None:
+            self.owner = self.instance.user = member
+        return super().clean()
 
 
 class WorkForm(TimedEntryForm):

@@ -62,7 +62,7 @@
         <span class="brand-mark">{% icon "timer" 18 %}</span>
         <span class="brand-name">{{ brand_name }}<small>{{ brand_tagline }}</small></span>
       </a>
-      {% if user.can_log_interviews %}
+      {% if user.has_access %}
         <nav class="appnav" aria-label="Sections">
           {% url 'tracker:home' as home %}
           <a href="{% if nav == 'home' %}{% else %}{{ home }}{% endif %}#overview" data-section="overview">Overview</a>
@@ -71,13 +71,11 @@
         </nav>
       {% endif %}
       <div class="appbar-actions">
-        {% if user.can_log_interviews and nav != "log" %}
+        {% if user.logs_own_work and nav != "log" %}
           {% if kind == "bids" %}
             <a class="btn btn-primary" href="{% url 'tracker:bid_create' %}" aria-label="Log bids">{% icon "plus" %}<span class="btn-text">Log bids</span></a>
-          {% elif kind == "work" %}
-            <a class="btn btn-primary" href="{% url 'tracker:interview_create' %}" aria-label="Log work">{% icon "plus" %}<span class="btn-text">Log work</span></a>
           {% else %}
-            <a class="btn btn-primary" href="{% url 'tracker:interview_create' %}" aria-label="Log interview">{% icon "plus" %}<span class="btn-text">Log interview</span></a>
+            <a class="btn btn-primary" href="{% url 'tracker:interview_create' %}" aria-label="Log work">{% icon "plus" %}<span class="btn-text">Log work</span></a>
           {% endif %}
         {% endif %}
         <details class="user-menu" data-menu>

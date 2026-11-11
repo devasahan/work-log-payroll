@@ -13,7 +13,7 @@ class User(AbstractUser):
 
     is_approved = models.BooleanField(
         default=False,
-        help_text="Approved members can log interviews. New sign-ups wait for an admin.",
+        help_text="Approved members can use the app. New sign-ups wait for an admin.",
     )
     team_role = models.CharField(
         "role",
@@ -34,8 +34,14 @@ class User(AbstractUser):
         return self.get_full_name() or self.username
 
     @property
-    def can_log_interviews(self):
+    def has_access(self):
+        """Approved members and admins use the app; new sign-ups wait for an admin."""
         return self.is_active and (self.is_approved or self.is_staff)
+
+    @property
+    def logs_own_work(self):
+        """Developers and virtual assistants log their own work; the admin logs interviewers' interviews."""
+        return self.has_access and not self.is_staff and self.work_kind != "interview"
 
     @property
     def logs_bids(self):

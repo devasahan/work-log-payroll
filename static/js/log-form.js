@@ -1,5 +1,6 @@
 // Log forms: live "Duration: 1h 30m" under the times, and the pay card beside the form
 // ("56 bids × $0.08" → $4.48). Amounts are rounded like the server: to the cent, halves up.
+// On the admin's interview form the rates follow the interviewer picked.
 (function () {
   var form = document.querySelector("[data-log-form]");
   if (!form) return;
@@ -10,8 +11,11 @@
   var bids = form.querySelector('[name="bids"]');
   var durationOut = document.getElementById("duration-preview");
   var card = document.querySelector("[data-pay-preview]");
+  var member = form.querySelector('[name="member"]');
   var ratesData = document.getElementById("pay-rates");
   var rates = ratesData ? JSON.parse(ratesData.textContent) : [];
+  var byMemberData = document.getElementById("pay-rates-by-member");
+  var ratesByMember = byMemberData ? JSON.parse(byMemberData.textContent) : null;
   var MAX_MINUTES = 12 * 60;
 
   function toMinutes(value) {
@@ -75,6 +79,7 @@
   // The rate in cents on a day: the latest one that started by then. A member's first
   // rate also covers earlier days (the server does the same).
   function rateOn(day) {
+    if (ratesByMember) rates = ratesByMember[member.value] || [];
     if (!rates.length) return null;
     var chosen = rates[0][1];
     rates.forEach(function (item) {
@@ -87,9 +92,16 @@
     var time = timed ? worked() : null;
     if (timed) showDuration(time);
 
+    if (ratesByMember && !member.value) {
+      showAmount(null);
+      rateOut.textContent = "—";
+      formulaOut.textContent = "Choose the interviewer to see the pay.";
+      return;
+    }
     var rate = rateOn(date.value || card.getAttribute("data-today"));
     if (rate === null) {
       showAmount(null);
+      rateOut.textContent = "Not set yet";
       formulaOut.textContent = "No rate is set yet.";
       return;
     }
@@ -116,7 +128,7 @@
     formulaOut.textContent = count.toLocaleString("en-US") + " bid" + (count === 1 ? "" : "s") + " × " + money(rate);
   }
 
-  [date, start, end, bids].forEach(function (input) {
+  [member, date, start, end, bids].forEach(function (input) {
     if (!input) return;
     input.addEventListener("input", update);
     input.addEventListener("change", update);
