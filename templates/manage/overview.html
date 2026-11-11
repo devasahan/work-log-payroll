@@ -8,7 +8,7 @@
     <p class="page-sub">{{ today|date:"l, F j, Y" }} · Pay week {{ week.label }}</p>
   </div>
   <div class="page-actions">
-    <a class="btn" href="{% url 'tracker:manage_interview_create' %}">{% icon "plus" %} Log interview</a>
+    <a class="btn" href="{% url 'tracker:manage_interview_create' %}?next={{ request.get_full_path|urlencode }}">{% icon "plus" %} Log interview</a>
     <a class="btn" href="{% url 'tracker:manage_payroll_week' week.start %}">{% icon "calendar-clock" %} This week's payroll</a>
     <a class="btn btn-primary" href="{% url 'tracker:manage_payroll' %}">{% icon "wallet" %} Payroll</a>
   </div>
@@ -57,7 +57,7 @@
     {% if chart %}
       {% include "includes/chart.html" with chart_title="Team earnings per pay week, last 8 weeks" %}
     {% else %}
-      {% include "includes/empty.html" with empty_icon="trending-up" empty_title="No earnings yet" empty_text="Weekly totals appear here as your team logs work." %}
+      {% include "includes/empty.html" with empty_icon="trending-up" empty_title="No earnings yet" empty_text="Weekly totals appear here as work is logged." %}
     {% endif %}
   </section>
 
@@ -128,7 +128,7 @@
   {% if recent %}
     {% include "tracker/_interview_table.html" with interviews=recent show_user=True can_set_paid=True %}
   {% else %}
-    {% include "includes/empty.html" with empty_icon="calendar-days" empty_title="Nothing logged yet" empty_text="Interviews, work hours and bids appear here as your team logs them." %}
+    {% include "includes/empty.html" with empty_icon="calendar-days" empty_title="Nothing logged yet" empty_text="Interviews, work hours and bids appear here as they're logged." %}
   {% endif %}
 </section>
 {% endblock %}

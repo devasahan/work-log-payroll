@@ -26,6 +26,7 @@ from .forms import (
     PayoutForm,
     RateForm,
     RoleForm,
+    interviewers,
 )
 from .models import HourlyRate, Interview, InterviewType, Payout
 from .periods import Period, format_range, parse_date
@@ -338,6 +339,8 @@ def _work_log_url(member_id=None, day=None):
 @staff_required
 def interview_log(request):
     """Log an interview for an interviewer. Interviewers don't log their own."""
+    back = safe_next(request, "")
+    members = list(interviewers())
     if request.method == "POST":
         form = AdminInterviewForm(request.POST)
         if form.is_valid():
@@ -347,18 +350,21 @@ def interview_log(request):
                 f"Logged {duration(entry.duration_minutes)} for {entry.user.display_name} with {entry.interview_with}.",
             )
             if "add_another" in request.POST:
-                query = urlencode({"user": entry.user_id, "date": entry.date.isoformat()})
-                return redirect(f"{reverse('tracker:manage_interview_create')}?{query}")
+                query = {"user": entry.user_id, "date": entry.date.isoformat(), **({"next": back} if back else {})}
+                return redirect(f"{reverse('tracker:manage_interview_create')}?{urlencode(query)}")
             return redirect(_work_log_url(entry.user_id, entry.date))
     else:
+        today = timezone.localdate()
+        member_id = _int_or_none(request.GET.get("user"))
+        day = parse_date(request.GET.get("date"))
         form = AdminInterviewForm(
             initial={
-                "member": _int_or_none(request.GET.get("user")),
-                "date": parse_date(request.GET.get("date")) or timezone.localdate(),
+                "member": member_id if any(member.pk == member_id for member in members) else None,
+                # Interviews can't be in the future, so a link from next week's log starts at today.
+                "date": day if day and day <= today else today,
             }
         )
 
-    members = list(form.fields["member"].queryset)
     rate_book = RateBook([member.pk for member in members])
     chosen = _int_or_none(form["member"].value())
     rates = {member.pk: [] for member in members}
@@ -373,7 +379,8 @@ def interview_log(request):
             "kind": "interview",
             "for_member": True,
             "heading": "Log an interview",
-            "cancel_url": _work_log_url(chosen),
+            "next": back,
+            "cancel_url": back or _work_log_url(chosen),
             "pay": {
                 "unit": "h",
                 "unit_word": "hour",

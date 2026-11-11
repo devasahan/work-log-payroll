@@ -13,7 +13,7 @@ class User(AbstractUser):
 
     is_approved = models.BooleanField(
         default=False,
-        help_text="Approved members can log interviews. New sign-ups wait for an admin.",
+        help_text="Approved members can use the app. New sign-ups wait for an admin.",
     )
     team_role = models.CharField(
         "role",

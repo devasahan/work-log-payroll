@@ -29,7 +29,7 @@ class SignUpView(FormView):
         messages.success(
             self.request,
             "Welcome aboard! An admin will approve your account and set your role and "
-            "rate, then you can start logging your work.",
+            "rate. Then this page becomes your dashboard for your work and payments.",
         )
         return redirect("tracker:home")
 

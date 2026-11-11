@@ -23,7 +23,7 @@
   <div class="page-actions">
     <a class="btn" href="{% url 'tracker:manage_interviews' %}?user={{ member.pk }}">{% icon "calendar-days" %} Weekly &amp; monthly history</a>
     {% if member.status == "active" and member.work_kind == "interview" %}
-      <a class="btn btn-primary" href="{% url 'tracker:manage_interview_create' %}?user={{ member.pk }}">{% icon "plus" %} Log interview</a>
+      <a class="btn btn-primary" href="{% url 'tracker:manage_interview_create' %}?user={{ member.pk }}&amp;next={{ request.get_full_path|urlencode }}">{% icon "plus" %} Log interview</a>
     {% endif %}
   </div>
 </div>

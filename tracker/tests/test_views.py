@@ -282,6 +282,34 @@ class AdminLogsInterviewsTests(TestCase):
         interview.refresh_from_db()
         self.assertEqual(interview.duration_minutes, 60)
 
+    def test_date_and_time_checks_run_before_an_interviewer_is_picked(self):
+        response = self.client.post(self.url, interview_data(end_time="09:00"))
+        self.assertContains(response, "Choose who did the interview.")
+        self.assertContains(response, "must be different from the start time")
+
+    def test_links_only_preselect_interviewers_and_past_days(self):
+        developer = make_user("dana", team_role="developer")
+        page = self.client.get(self.url, {"user": developer.pk, "date": (self.today + timedelta(days=7)).isoformat()})
+        self.assertEqual(page.context["form"]["member"].value(), None)
+        self.assertEqual(page.context["form"]["date"].value(), self.today)
+        self.assertContains(page, "Choose the interviewer to see the pay.")
+        work_log = self.client.get(reverse("tracker:manage_interviews"), {"user": developer.pk})
+        self.assertContains(work_log, f"{self.url}?date=")
+        self.assertNotContains(work_log, f"{self.url}?user={developer.pk}")
+
+    def test_says_what_to_do_when_there_are_no_interviewers(self):
+        self.interviewer.team_role = "developer"
+        self.interviewer.save()
+        self.assertContains(self.client.get(self.url), "No interviewers yet.")
+
+    def test_back_returns_to_the_page_the_admin_came_from(self):
+        member_page = reverse("tracker:manage_member", args=[self.interviewer.pk])
+        page = self.client.get(self.url, {"user": self.interviewer.pk, "next": member_page})
+        self.assertEqual(page.context["cancel_url"], member_page)
+        response = self.client.post(self.url, {**self.data(), "add_another": "1", "next": member_page})
+        self.assertIn("next=", response.url)
+        self.assertEqual(self.client.get(response.url).context["cancel_url"], member_page)
+
     def test_admin_can_delete_an_interview(self):
         interview = make_interview(self.interviewer, day=self.today)
         self.client.post(reverse("tracker:interview_delete", args=[interview.pk]))

@@ -1,10 +1,10 @@
 # Work Log & Payroll
 
-Work logging and weekly payroll for the AsahanTechPartners team. Interviewers, developers and virtual assistants log their work, and the admin pays each member weekly at their own rate: per hour for interviewers and developers, per bid for virtual assistants.
+Work logging and weekly payroll for the AsahanTechPartners team. Developers and virtual assistants log their own work, the admin logs interviewers' interviews, and the admin pays each member weekly at their own rate: per hour for interviewers and developers, per bid for virtual assistants.
 
 **Members can:**
 - Sign up, then wait for the admin to approve them and set their role and rate.
-- Log their work. What they log depends on their role:
+- Track their work, depending on their role:
   - **Developers** log their working hours: date, start and end time, the project and the task.
   - **Virtual assistants** log how many bids they sent each day.
   - **Interviewers** don't log anything themselves: the admin logs each of their interviews, and they see them with their pay.

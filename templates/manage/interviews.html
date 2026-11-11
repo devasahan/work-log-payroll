@@ -11,7 +11,7 @@
     <p class="page-sub">{% if selected_member %}Everything logged for {{ selected_member.display_name }}, by week or month.{% else %}Everything logged for your team (interviews, work hours and bids), by week or month.{% endif %}</p>
   </div>
   <div class="page-actions">
-    <a class="btn btn-primary" href="{% url 'tracker:manage_interview_create' %}?{% if selected_member %}user={{ selected_member.pk }}&amp;{% endif %}date={{ anchor|date:'Y-m-d' }}">{% icon "plus" %} Log interview</a>
+    <a class="btn btn-primary" href="{% url 'tracker:manage_interview_create' %}?{% if selected_member.status == "active" and selected_member.work_kind == "interview" %}user={{ selected_member.pk }}&amp;{% endif %}date={{ anchor|date:'Y-m-d' }}&amp;next={{ request.get_full_path|urlencode }}">{% icon "plus" %} Log interview</a>
   </div>
 </div>
 

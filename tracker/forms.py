@@ -55,7 +55,12 @@ class TimedEntryForm(forms.ModelForm):
         if day is not None and start is not None and end is not None:
             try:
                 validate_time_slot(
-                    user_id=self.owner.pk, day=day, start=start, end=end, exclude_pk=self.instance.pk, kind=self.kind
+                    user_id=getattr(self.owner, "pk", None),
+                    day=day,
+                    start=start,
+                    end=end,
+                    exclude_pk=self.instance.pk,
+                    kind=self.kind,
                 )
             except ValidationError as error:
                 self.add_error(None, error)
@@ -75,7 +80,7 @@ class InterviewForm(TimedEntryForm):
             "role": "Role",
         }
         help_texts = {
-            "interview_with": "The company or person you interviewed with.",
+            "interview_with": "The company or person they interviewed with.",
         }
 
     def __init__(self, *args, **kwargs):
@@ -109,14 +114,15 @@ class AdminInterviewForm(InterviewForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, owner=None, **kwargs)
-        self.fields["member"].queryset = interviewers()
-        self.fields["interview_with"].help_text = "The company or person they interviewed with."
+        member = self.fields["member"]
+        member.queryset = interviewers()
+        if not member.queryset.exists():
+            member.help_text = "No interviewers yet. Approve a member as an Interviewer on the Team page first."
 
     def clean(self):
         member = self.cleaned_data.get("member")
-        if member is None:
-            return forms.ModelForm.clean(self)  # the overlap check needs to know whose interview it is
-        self.owner = self.instance.user = member
+        if member is not None:
+            self.owner = self.instance.user = member
         return super().clean()
 
 
